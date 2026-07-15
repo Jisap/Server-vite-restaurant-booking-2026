@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import bcrypt from "bcrypt";
+import { AuthRequest } from "../middlewares/auth.js";
 
 // Helper to generate a JWT token
 export const generateToken = (id: string) => {
@@ -106,11 +107,17 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 // Get user profile
 // GET /api/auth/me
 // @access Private
-export const getMe = async (req: Request, res: Response): Promise<void> => {
+export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user) {                                              // Si no hay usuario en la request que viene del middleware protect
+      res.status(401).json({ message: "Not authorized" })         // denegamos acceso
+      return;
+    }
 
-  } catch (error) {
+    res.json(req.user);                                           // Si si lo hay respondemos con los datos del usuario
+
+  } catch (error: any) {
     console.log(error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(400).json({ message: error.message });
   }
 }

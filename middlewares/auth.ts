@@ -18,7 +18,7 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
         return;
       }
 
-      req.user = user;
+      req.user = user; // Añadimos el user al request para usarlo en los controladores
       next();
 
     } catch (error: any) {
