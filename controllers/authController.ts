@@ -67,10 +67,39 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 // POST /api/auth/login
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      res.status(400).json({ message: "Please enter your email and password" });
+      return;
+    }
 
-  } catch (error) {
+    // Check for user
+    const user = await User.findOne({ email })
+    if (!user) {
+      res.status(401).json({ message: "Invalid email or password" });
+      return;
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password || "") // bcrypt compara el password introducido con el de la BBDD. La pass de bd contiene el salt y lo aplica a las pass ingresada, si el hass generado es idéntico devuelve true
+    if (!isMatch) {
+      res.status(401).json({ message: "Invalid email or password" });
+      return;
+    }
+
+    if (user) {
+      res.status(201).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        token: generateToken(user._id.toString())
+      })
+    }
+  } catch (error: any) {
     console.log(error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: error.message });
   }
 }
 
