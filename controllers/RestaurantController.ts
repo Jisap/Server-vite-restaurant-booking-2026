@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { Restaurant } from "../models/Restaurant.js";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User.js";
 
 
 // Get all restaurants with search and filters
@@ -77,8 +79,38 @@ export const getFeaturedRestaurants = async (req: Request, res: Response): Promi
 
 // Get single restaurant by slug 
 // GET /api/restaurants/:slug
-export const getdRestaurantBySlug = async (req: Request, res: Response): Promise<void> => {
+export const getRestaurantBySlug = async (req: Request, res: Response): Promise<void> => {
   try {
+    const restaurant = await Restaurant.findOne({ slug: req.params.slug });                            // Busca el restaurante cuyo slug coincida con el recibido en la URL.
+    if (!restaurant) {
+      res.status(404).json({ message: "Restaurant not found" })
+      return;
+    }
+
+    if (restaurant.status !== "approved") {                                                             // Si el restaurante aún no está aprobado, solo podrán acceder a él el administrador o su propietario.
+      let isAuthorized = false;                                                                         // Por defecto, ningún usuario está autorizado.
+      if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {                // Comprueba si la petición incluye un token JWT.
+        try {
+          const token = req.headers.authorization.split(" ")[1];                                        // Extrae el token eliminando el prefijo "Bearer ".
+          const decoded = jwt.verify(token, process.env.JWT_SECRET! as string) as { id: string };       // Verifica el token y obtiene el id del usuario. 
+          const user = await User.findById(decoded.id);                                                 // Busca el usuario en la base de datos.
+
+          // Un administrador puede acceder a cualquier restaurante.
+          // Un propietario solo puede acceder a sus propios restaurantes.
+          if (user && (user.role === "admin" || user.role === "owner" && restaurant.owner.toString() === user._id.toString())) {
+            isAuthorized = true;
+          }
+        } catch (error) {
+          // Si el token es inválido o ha expirado,
+          // simplemente se considera que el usuario no está autorizado.
+        }
+      }
+      if (!isAuthorized) {                                                                                // Si el usuario no está autorizado,
+        res.status(404).json({ message: "Restaurant not found or pending approval" });                    // se devuelve un error 404.
+        return
+      }
+    }
+    res.json(restaurant);                                                                                 // Si el restaurante existe y el usuario está autorizado, se devuelve el restaurante.
 
   } catch (error: any) {
     console.log(error);
