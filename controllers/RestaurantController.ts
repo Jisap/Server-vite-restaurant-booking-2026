@@ -122,6 +122,21 @@ export const getRestaurantBySlug = async (req: Request, res: Response): Promise<
 // GET /api/restaurants/:id/availability
 export const getRestaurantAvailability = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { date } = req.query;
+    if (!date) {
+      res.status(400).json({ message: "Please provide a date" });
+      return;
+    }
+
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      res.status(404).json({ message: "Restaurant not found" });
+      return;
+    }
+
+    const bookingDate = new Date(date as string);
+
+    // Get all active bookings on this date for the restaurant
 
   } catch (error: any) {
     console.log(error);
