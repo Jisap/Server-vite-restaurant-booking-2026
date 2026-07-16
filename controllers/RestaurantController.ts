@@ -63,10 +63,15 @@ export const getRestaurants = async (req: Request, res: Response): Promise<void>
 // GET /api/restaurants/featured
 export const getFeaturedRestaurants = async (req: Request, res: Response): Promise<void> => {
   try {
+    const featured = await Restaurant.find({
+      status: "approved",
+      $or: [{ featured: true }, { exclusive: true }]
+    }).limit(6);
 
+    res.json(featured);
   } catch (error: any) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
+    console.log("Get Featured Restaurant Error", error);
+    res.status(500).json({ message: "Server error" });
   }
 }
 
