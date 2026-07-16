@@ -145,10 +145,12 @@ export const getRestaurantAvailability = async (req: Request, res: Response): Pr
     })
 
     // Map slots to available capacities
-    const availability = restaurant.availableSlots.map((slot) => {                                    // Itera sobre cada franja horaria disponible.
-      const bookedSeats = bookings.filter((b) => b.time === slot).reduce((sum, b) => sum + b.guests, 0)   // Calcula el número total de asientos reservados para esa franja horaria.
+    const availability = restaurant.availableSlots.map((slot) => {                                        // Itera sobre cada franja horaria disponible ["13:00", "13:30", "14:00"].
+      const bookedSeats = bookings
+        .filter((b) => b.time === slot)                                                                   // crea un nuevo array en memoria con solo las reservas cuya hora coincide exactamente con el slot. 
+        .reduce((sum, b) => sum + b.guests, 0)                                                            // suma la propiedad guests de esas reservas filtradas, empezando desde 0
       const totalSeats = restaurant.totalSeats || 20;                                                     // Obtiene el número total de asientos del restaurante, con un valor predeterminado de 20.
-      const availableSeats = Math.max(0, totalSeats - bookedSeats);                                       // Calcula el número de asientos disponibles.
+      const availableSeats = Math.max(0, totalSeats - bookedSeats);                                       // Calcula el número de asientos disponibles. Resta los asientos reservados al total.
 
       return {
         time: slot,
