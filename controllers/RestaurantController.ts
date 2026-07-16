@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { Restaurant } from "../models/Restaurant.js";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
+import { Booking } from "../models/Booking.js";
 
 
 // Get all restaurants with search and filters
@@ -122,21 +123,41 @@ export const getRestaurantBySlug = async (req: Request, res: Response): Promise<
 // GET /api/restaurants/:id/availability
 export const getRestaurantAvailability = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { date } = req.query;
+    const { date } = req.query;                                                 // Fecha de la reserva
     if (!date) {
       res.status(400).json({ message: "Please provide a date" });
       return;
     }
 
-    const restaurant = await Restaurant.findById(req.params.id);
+    const restaurant = await Restaurant.findById(req.params.id);                // Busca el restaurante por su ID.
     if (!restaurant) {
       res.status(404).json({ message: "Restaurant not found" });
       return;
     }
 
-    const bookingDate = new Date(date as string);
+    const bookingDate = new Date(date as string);                               // Crea un objeto Date a partir de la fecha recibida.
 
     // Get all active bookings on this date for the restaurant
+    const bookings = await Booking.find({                                       // Busca todas las reservas activas para la fecha y el restaurante.
+      restaurant: restaurant._id,
+      date: bookingDate,
+      status: "confirmed"
+    })
+
+    // Map slots to available capacities
+    const availability = restaurant.availableSlots.map((slot) => {                                    // Itera sobre cada franja horaria disponible.
+      const bookedSeats = bookings.filter((b) => b.time === slot).reduce((sum, b) => sum + b.guests, 0)   // Calcula el número total de asientos reservados para esa franja horaria.
+      const totalSeats = restaurant.totalSeats || 20;                                                     // Obtiene el número total de asientos del restaurante, con un valor predeterminado de 20.
+      const availableSeats = Math.max(0, totalSeats - bookedSeats);                                       // Calcula el número de asientos disponibles.
+
+      return {
+        time: slot,
+        available: availableSeats,
+        isAvailable: availableSeats > 0
+      }
+    })
+
+    res.json(availability);
 
   } catch (error: any) {
     console.log(error);
