@@ -81,7 +81,11 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
 // @access Private
 export const getMyBookings = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
+        const bookings = await Booking.find({ user: req.user?._id })
+            .populate("restaurant", "name location image address")
+            .sort({ date: -1, time: -1 }); // Ordenamos por fecha de creación (más recientes primero)
 
+        res.status(200).json(bookings);
     }
     catch (error: any) {
         console.log("Create Booking Error", error)
