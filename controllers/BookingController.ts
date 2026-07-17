@@ -98,7 +98,26 @@ export const getMyBookings = async (req: AuthRequest, res: Response): Promise<vo
 // @access Private
 export const cancelBooking = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
+        const booking = await Booking.findById(req.params.id);
+        if (!booking) {
+            res.status(404).json({ message: "Booking not found" });
+            return;
+        }
 
+        // Verify user owns the booking
+        if (booking.user?.toString() !== req.user?._id.toString()) {
+            res.status(403).json({ message: "Not authorized to cancel this booking" });
+            return;
+        }
+
+        booking.status = "cancelled";
+        await booking.save();
+
+        const populatedBooking = await booking.populate("restaurant", "name location image address"); // Seleccionamos los campos que queremos que se muestren en el frontend
+        res.status(200).json({
+            message: "Booking cancelled successfully",
+            booking: populatedBooking // Mostramos el restaurante con todos los datos
+        });
     }
     catch (error: any) {
         console.log("Create Booking Error", error)
