@@ -186,6 +186,28 @@ export const getOwnerBookings = async (req: AuthRequest, res: Response): Promise
 // PUT /api/owner/bookings/:id/status
 export const updateBookingStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const { status } = req.body;
+    if (!status || !["confirmed", "cancelled", "completed", "noshow"].includes(status)) {
+      res.status(400).json({ message: "Please enter a valid booking status" })
+      return;
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      res.status(404).json({ message: "Booking not found" })
+      return;
+    }
+
+    // Verify booking belongs to the owner's restaurant
+    const restaurant = await Restaurant.findById(booking.restaurant)
+    if (!restaurant || restaurant.owner.toString() !== req.user?._id?.toString()) {
+      res.status(403).json({ message: "Unauthorized access to this booking" })
+      return;
+    }
+
+    booking.status = status
+    await booking.save()
+    res.json(booking)
 
   } catch (error: any) {
     console.error(error);
