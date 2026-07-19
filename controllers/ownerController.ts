@@ -119,6 +119,37 @@ export const createOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
 // PUT /api/owner/restaurant/:id
 export const updateOwnerRestaurant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const restaurant = await Restaurant.findOne({
+      owner: req.user?._id
+    });
+    if (!restaurant) {
+      res.status(404).json({ message: "Restaurant not found" });
+      return;
+    }
+    const { name, description, cuisine, priceRange, location, address, chef, tags, availableSlots, totalSeats } = req.body;
+    if (name) restaurant.name = name;
+    if (description) restaurant.description = description;
+    if (cuisine) restaurant.cuisine = cuisine;
+    if (priceRange) restaurant.priceRange = priceRange;
+    if (location) restaurant.location = location;
+    if (address) restaurant.address = address;
+    if (chef) restaurant.chef = chef;
+    if (totalSeats) restaurant.totalSeats = totalSeats;
+    if (tags) {
+      restaurant.tags = typeof tags === "string" ? tags.split(",").map((t) => t.trim()) : tags;
+    }
+    if (availableSlots) {
+      typeof availableSlots === "string" ? availableSlots.split(",").map((s) => s.trim()) : availableSlots;
+    }
+
+    // Upload new image
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      restaurant.image = result.secure_url;
+    }
+
+    const updated = await restaurant.save()
+    res.json(updated);
 
   } catch (error: any) {
     console.error(error);
