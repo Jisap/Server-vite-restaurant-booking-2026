@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { Restaurant } from "../models/Restaurant.js";
 import { AuthRequest } from "../middlewares/auth.js";
 import { v2 as cloudinary } from "cloudinary"
+import { Booking } from "../models/Booking.js";
 
 
 
@@ -161,6 +162,19 @@ export const updateOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
 // GET /api/owner/bookings
 export const getOwnerBookings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const restaurant = await Restaurant.findOne({
+      owner: req.user?._id,
+    });
+    if (!restaurant) {
+      res.status(404).json({ message: "Restaurant profile not found" });
+      return;
+    }
+
+    const bookings = await Booking.find({ restaurant: restaurant._id })
+      .populate("user", "name email phone")
+      .sort({ date: -1, time: -1 })
+
+    res.json(bookings)
 
   } catch (error: any) {
     console.error(error);
