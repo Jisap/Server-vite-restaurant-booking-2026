@@ -1,30 +1,53 @@
-
-
-
 import { Response } from "express";
 import { AuthRequest } from "../middlewares/auth.js";
-
-
+import { Restaurant } from "../models/Restaurant.js";
 
 
 // Get all restaurants for admin management
 // GET /api/admin/restaurants
 export const getAllRestaurants = async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-
-    } catch (error: any) {
-        console.log(error);
-        res.status(400).json({ message: error.message });
-    }
+  try {
+    const restaurants = await Restaurant.find({}).populate("owner", "name email phone").sort({ createdAt: -1 });
+    res.json(restaurants)
+  } catch (error: any) {
+    console.log(error);
+    res.status(400).json({ message: error.message });
+  }
 }
 
 // Approve/reject a restaurant profile
 // PUT  /api/admin/restaurants/:id/approve
 export const approveRestaurant = async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-
-    } catch (error: any) {
-        console.log(error);
-        res.status(400).json({ message: error.message });
+  try {
+    const { status } = req.body;
+    if (!status || !["approved", "rejected", "pending"].includes(status)) {
+      res.status(400).json({ message: "Please provide a valid approval status" });
+      return;
     }
+
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      res.status(404).json({ message: "Restaurant profile not found" });
+      return;
+    }
+
+    restaurant.status = status;
+    await restaurant.save();
+    res.json(restaurant);
+
+  } catch (error: any) {
+    console.log(error);
+    res.status(400).json({ message: error.message });
+  }
+}
+
+// Get system statistics
+// GET /api/admin/stats
+export const getAdminStats = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+
+  } catch (error: any) {
+    console.log(error);
+    res.status(400).json({ message: error.message });
+  }
 }
