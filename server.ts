@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import auhtRouter from "./routes/authRoutes.js";
 import restaurantRouter from "./routes/restaurantroutes.js";
 import bookingRouter from "./routes/bookingRoutes.js";
+import ownerRouter from "./routes/ownerRoutes.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use("/api/auth", auhtRouter);
 app.use("/api/restaurants", restaurantRouter);
 app.use("/api/bookings", bookingRouter);
+app.use("/api/owner", ownerRouter);
 
 
 // Global Error Handler
