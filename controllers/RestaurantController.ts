@@ -9,7 +9,7 @@ import { Booking } from "../models/Booking.js";
 // GET /api/restaurants
 export const getRestaurants = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { search, priceRange, rating, location, sort } = req.query;     // Toma los parámetros de la url
+    const { search, cuisine, priceRange, rating, location, sort } = req.query;     // Toma los parámetros de la url
 
     const queryObject: any = { status: "approved" }                         // se crea un objeto vacío con una condición inicial.
 
@@ -19,6 +19,13 @@ export const getRestaurants = async (req: Request, res: Response): Promise<void>
         { cuisine: { $regex: search, $options: "i" } },
         { location: { $regex: search, $options: "i" } }
       ]
+    }
+
+    if (cuisine) {
+      const cuisines = Array.isArray(cuisine)
+        ? cuisine
+        : [cuisine];
+      queryObject.cuisine = { $in: cuisines.map((c) => new RegExp(`^${c}$`, "i")) };
     }
 
     if (priceRange) {                                                          // priceRange puede llegar como un único valor ("$$")

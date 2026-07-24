@@ -1,0 +1,154 @@
+import { Restaurant } from "../models/Restaurant.js";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User.js";
+import { Booking } from "../models/Booking.js";
+// Get all restaurants with search and filters
+// GET /api/restaurants
+export const getRestaurants = async (req, res) => {
+    try {
+        const { search, cuisine, priceRange, rating, location, sort } = req.query; // Toma los parámetros de la url
+        const queryObject = { status: "approved" }; // se crea un objeto vacío con una condición inicial.
+        if (search) { // Si existe el parámetro search
+            queryObject.$or = [
+                { name: { $regex: search, $options: "i" } }, // MongoDB devolverá el restaurante si el texto buscado aparece en nombre, la cocina o la ubicación
+                { cuisine: { $regex: search, $options: "i" } },
+                { location: { $regex: search, $options: "i" } }
+            ];
+        }
+        if (cuisine) {
+            const cuisines = Array.isArray(cuisine)
+                ? cuisine
+                : [cuisine];
+            queryObject.cuisine = { $in: cuisines.map((c) => new RegExp(`^${c}$`, "i")) };
+        }
+        if (priceRange) { // priceRange puede llegar como un único valor ("$$")
+            const prices = Array.isArray(priceRange) // o como un array (["$", "$$"]) si el usuario selecciona varios.
+                ? priceRange // Nos aseguramos de trabajar siempre con un array.
+                : [priceRange];
+            queryObject.priceRange = { $in: prices }; // $in devuelve los documentos cuyo priceRange 
+        } // coincida con cualquiera de los valores del array.
+        if (rating) { // $gte (Greater Than or Equal) devuelve los documentos
+            queryObject.rating = { $gte: parseFloat(rating) }; // cuyo valor sea mayor o igual que el indicado  
+        } // parseFloat() convierte el valor de rating a número 
+        // para que pueda ser comparado con el rating del documento.
+        if (location) { // Busca coincidencias parciales en el campo location.
+            queryObject.location = { $regex: location, $options: "i" }; // $options: "i" hace que la búsqueda no distinga entre mayúsculas y minúsculas.
+        }
+        // Sorting
+        // Por defecto, los restaurantes se ordenan por fecha de creación (más recientes primero).
+        let sortOption = { createdAt: -1 };
+        if (sort === "rating") {
+            sortOption = { rating: -1 }; // Ordenar por valoración de mayor a menor.
+        }
+        else if (sort === "price_low") {
+            sortOption = { priceRange: 1 }; // Ordenar por precio de menor a mayor.
+        }
+        else if (sort === "price_high") {
+            sortOption = { priceRange: -1 }; // Ordenar por precio de mayor a menor.
+        }
+        // En MongoDB:
+        //   1  -> orden ascendente
+        //  -1  -> orden descendente
+        const restaurant = await Restaurant.find(queryObject).sort(sortOption);
+        res.json(restaurant);
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+// Get featured and exclusive restaurants 
+// GET /api/restaurants/featured
+export const getFeaturedRestaurants = async (req, res) => {
+    try {
+        const featured = await Restaurant.find({
+            status: "approved",
+            $or: [{ featured: true }, { exclusive: true }]
+        }).limit(6);
+        res.json(featured);
+    }
+    catch (error) {
+        console.log("Get Featured Restaurant Error", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+// Get single restaurant by slug 
+// GET /api/restaurants/:slug
+export const getRestaurantBySlug = async (req, res) => {
+    try {
+        const restaurant = await Restaurant.findOne({ slug: req.params.slug }); // Busca el restaurante cuyo slug coincida con el recibido en la URL.
+        if (!restaurant) {
+            res.status(404).json({ message: "Restaurant not found" });
+            return;
+        }
+        if (restaurant.status !== "approved") { // Si el restaurante aún no está aprobado, solo podrán acceder a él el administrador o su propietario.
+            let isAuthorized = false; // Por defecto, ningún usuario está autorizado.
+            if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) { // Comprueba si la petición incluye un token JWT.
+                try {
+                    const token = req.headers.authorization.split(" ")[1]; // Extrae el token eliminando el prefijo "Bearer ".
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verifica el token y obtiene el id del usuario. 
+                    const user = await User.findById(decoded.id); // Busca el usuario en la base de datos.
+                    // Un administrador puede acceder a cualquier restaurante.
+                    // Un propietario solo puede acceder a sus propios restaurantes.
+                    if (user && (user.role === "admin" || user.role === "owner" && restaurant.owner.toString() === user._id.toString())) {
+                        isAuthorized = true;
+                    }
+                }
+                catch (error) {
+                    // Si el token es inválido o ha expirado,
+                    // simplemente se considera que el usuario no está autorizado.
+                }
+            }
+            if (!isAuthorized) { // Si el usuario no está autorizado,
+                res.status(404).json({ message: "Restaurant not found or pending approval" }); // se devuelve un error 404.
+                return;
+            }
+        }
+        res.json(restaurant); // Si el restaurante existe y el usuario está autorizado, se devuelve el restaurante.
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+// Get dynamic seat availability for slots
+// GET /api/restaurants/:id/availability
+export const getRestaurantAvailability = async (req, res) => {
+    try {
+        const { date } = req.query; // Fecha de la reserva
+        if (!date) {
+            res.status(400).json({ message: "Please provide a date" });
+            return;
+        }
+        const restaurant = await Restaurant.findById(req.params.id); // Busca el restaurante por su ID.
+        if (!restaurant) {
+            res.status(404).json({ message: "Restaurant not found" });
+            return;
+        }
+        const bookingDate = new Date(date); // Crea un objeto Date a partir de la fecha recibida.
+        // Get all active bookings on this date for the restaurant
+        const bookings = await Booking.find({
+            restaurant: restaurant._id,
+            date: bookingDate,
+            status: "confirmed"
+        });
+        // Map slots to available capacities
+        const availability = restaurant.availableSlots.map((slot) => {
+            const bookedSeats = bookings
+                .filter((b) => b.time === slot) // crea un nuevo array en memoria con solo las reservas cuya hora coincide exactamente con el slot. 
+                .reduce((sum, b) => sum + b.guests, 0); // suma la propiedad guests de esas reservas filtradas, empezando desde 0
+            const totalSeats = restaurant.totalSeats || 20; // Obtiene el número total de asientos del restaurante, con un valor predeterminado de 20.
+            const availableSeats = Math.max(0, totalSeats - bookedSeats); // Calcula el número de asientos disponibles. Resta los asientos reservados al total.
+            return {
+                time: slot,
+                available: availableSeats,
+                isAvailable: availableSeats > 0
+            };
+        });
+        res.json(availability);
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+};
