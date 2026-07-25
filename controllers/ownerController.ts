@@ -58,7 +58,7 @@ export const createOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
 
     const { name, description, cuisine, priceRange, location, address, chef, tags, availableSlots, totalSeats } = req.body;
 
-    if (!name || !location || !description || !cuisine || !priceRange || !address || !chef || !tags || !availableSlots || !totalSeats) {
+    if (!name || !location || !description || !cuisine || !priceRange || !address || !chef || !availableSlots || !totalSeats) {
       res.status(400).json({ message: "All fields are required" });
       return;
     }
@@ -75,20 +75,25 @@ export const createOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Handle image
+    // Handle image (optional)
     let imageUrl = "";
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      imageUrl = result.secure_url;
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        imageUrl = result.secure_url;
+      } catch (uploadError: any) {
+        console.error("Cloudinary upload error:", uploadError);
+        // Continue without image rather than failing the whole request
+      }
     }
 
     // Setup parsed tags and slots
-    const parsedTags = typeof tags === "string"
-      ? tags.split(",").map((t) => t.trim())
-      : tags || [];
+    const parsedTags = typeof tags === "string" && tags.trim()
+      ? tags.split(",").map((t) => t.trim()).filter(Boolean)
+      : Array.isArray(tags) ? tags : [];
 
     const parsedSlots = typeof availableSlots === "string"
-      ? availableSlots.split(",").map((s) => s.trim())
+      ? availableSlots.split(",").map((s) => s.trim()).filter(Boolean)
       : availableSlots || ["17:00", "18:00", "19:00", "20:00", "21:00"];
 
     const restaurant = await Restaurant.create({
@@ -111,7 +116,7 @@ export const createOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
     res.status(201).json(restaurant);
 
   } catch (error: any) {
-    console.error(error);
+    console.error("createOwnerRestaurant error:", error);
     res.status(500).json({ message: error.message });
   }
 };
