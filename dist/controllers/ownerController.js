@@ -44,7 +44,7 @@ export const createOwnerRestaurant = async (req, res) => {
             return;
         }
         const { name, description, cuisine, priceRange, location, address, chef, tags, availableSlots, totalSeats } = req.body;
-        if (!name || !location || !description || !cuisine || !priceRange || !address || !chef || !tags || !availableSlots || !totalSeats) {
+        if (!name || !location || !description || !cuisine || !priceRange || !address || !chef || !availableSlots || !totalSeats) {
             res.status(400).json({ message: "All fields are required" });
             return;
         }
@@ -57,18 +57,29 @@ export const createOwnerRestaurant = async (req, res) => {
             res.status(400).json({ message: "Restaurant with this name already exists" });
             return;
         }
-        // Handle image
-        let imageUrl = "";
+        // Handle image upload
+        let imageUrl = "/restaurant_1.png";
         if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            imageUrl = result.secure_url;
+            console.log("Processing uploaded file:", req.file.originalname, "size:", req.file.size);
+            try {
+                const result = await uploadToCloudinary(req.file.buffer);
+                imageUrl = result.secure_url;
+            }
+            catch (uploadError) {
+                console.error("Cloudinary upload error, falling back to data URI:", uploadError?.message || uploadError);
+                const mime = req.file.mimetype || "image/jpeg";
+                imageUrl = `data:${mime};base64,${req.file.buffer.toString("base64")}`;
+            }
+        }
+        else {
+            console.log("No file uploaded in req.file, using default image:", imageUrl);
         }
         // Setup parsed tags and slots
-        const parsedTags = typeof tags === "string"
-            ? tags.split(",").map((t) => t.trim())
-            : tags || [];
+        const parsedTags = typeof tags === "string" && tags.trim()
+            ? tags.split(",").map((t) => t.trim()).filter(Boolean)
+            : Array.isArray(tags) ? tags : [];
         const parsedSlots = typeof availableSlots === "string"
-            ? availableSlots.split(",").map((s) => s.trim())
+            ? availableSlots.split(",").map((s) => s.trim()).filter(Boolean)
             : availableSlots || ["17:00", "18:00", "19:00", "20:00", "21:00"];
         const restaurant = await Restaurant.create({
             name,
@@ -89,7 +100,7 @@ export const createOwnerRestaurant = async (req, res) => {
         res.status(201).json(restaurant);
     }
     catch (error) {
-        console.error(error);
+        console.error("createOwnerRestaurant error:", error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -129,8 +140,15 @@ export const updateOwnerRestaurant = async (req, res) => {
         }
         // Upload new image
         if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            restaurant.image = result.secure_url;
+            try {
+                const result = await uploadToCloudinary(req.file.buffer);
+                restaurant.image = result.secure_url;
+            }
+            catch (uploadError) {
+                console.error("Cloudinary upload error on update, falling back to data URI:", uploadError?.message || uploadError);
+                const mime = req.file.mimetype || "image/jpeg";
+                restaurant.image = `data:${mime};base64,${req.file.buffer.toString("base64")}`;
+            }
         }
         const updated = await restaurant.save();
         res.json(updated);

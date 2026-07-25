@@ -75,16 +75,20 @@ export const createOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    // Handle image (optional)
-    let imageUrl = "";
+    // Handle image upload
+    let imageUrl = "/restaurant_1.png";
     if (req.file) {
+      console.log("Processing uploaded file:", req.file.originalname, "size:", req.file.size);
       try {
         const result = await uploadToCloudinary(req.file.buffer);
         imageUrl = result.secure_url;
       } catch (uploadError: any) {
-        console.error("Cloudinary upload error:", uploadError);
-        // Continue without image rather than failing the whole request
+        console.error("Cloudinary upload error, falling back to data URI:", uploadError?.message || uploadError);
+        const mime = req.file.mimetype || "image/jpeg";
+        imageUrl = `data:${mime};base64,${req.file.buffer.toString("base64")}`;
       }
+    } else {
+      console.log("No file uploaded in req.file, using default image:", imageUrl);
     }
 
     // Setup parsed tags and slots
@@ -150,8 +154,14 @@ export const updateOwnerRestaurant = async (req: AuthRequest, res: Response): Pr
 
     // Upload new image
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      restaurant.image = result.secure_url;
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        restaurant.image = result.secure_url;
+      } catch (uploadError: any) {
+        console.error("Cloudinary upload error on update, falling back to data URI:", uploadError?.message || uploadError);
+        const mime = req.file.mimetype || "image/jpeg";
+        restaurant.image = `data:${mime};base64,${req.file.buffer.toString("base64")}`;
+      }
     }
 
     const updated = await restaurant.save()
