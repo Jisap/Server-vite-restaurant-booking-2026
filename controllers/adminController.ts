@@ -71,6 +71,7 @@ export const getAdminStats = async (req: AuthRequest, res: Response): Promise<vo
       bookings: {
         total: totalBookings
       },
+      latestBookings: latestBooking,
       latestBooking
     })
 

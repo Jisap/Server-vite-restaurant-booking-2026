@@ -62,6 +62,7 @@ export const getAdminStats = async (req, res) => {
             bookings: {
                 total: totalBookings
             },
+            latestBookings: latestBooking,
             latestBooking
         });
     }
